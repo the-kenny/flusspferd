@@ -87,6 +87,17 @@ def set_options(opt):
                    help='Disable OS extension.')
     opt.add_option('--disable-gmp', action='store_true',
                    help='Disable GMP extension even if GMP is installed.')
+    opt.add_option('--disable-python-interface', action='store_true',
+                   help='Disable Python interface.')
+    python_default_version = '%s.%s' % (sys.version_info[0], sys.version_info[1])
+    opt.add_option('--with-python-version', action='store', nargs=1,
+                   dest='python_version',
+                   default=python_default_version,
+                   help='use specified python version [Default "%s"]' \
+                       % python_default_version)
+    opt.add_option('--with-python-include', action='store', nargs=1,
+                   dest='python_include',
+                   help='python include path')
     opt.add_option('--with-spidermonkey-include', action='store', nargs=1,
                    dest='spidermonkey_include',
                    help='spidermonkey include path without the js/')
@@ -251,6 +262,28 @@ int main() {
           conf.check_cxx(header_name='gmpxx.h', uselib_store='GMP')
         conf.env['ENABLE_GMP'] = available
 
+    # python
+    if not Options.options.disable_python_interface:
+        conf.env['PYTHON_VERSION'] = Options.options.python_version
+        python_includes = []
+        if not Options.options.python_include:
+            # TODO is there a way to get the default pathes of waf?
+            default_includes = ['/usr/include', '/usr/local/include',
+                                '/opt/local/include']
+            python_includes = map(
+                lambda x: os.path.join(x, 'python'+Options.options.python_version),
+                default_includes)
+        else:
+            python_includes = [Options.options.python_include,
+                               os.path.join(Options.options.python_include,
+                                            'python'+Options.options.python_version)]
+
+        # checking twice for boost is not that good!
+        conf.env['ENABLE_PYTHON_INTERFACE'] = conf.check_boost(lib = 'python', min_version='1.36.0') and \
+            conf.check_cxx(lib='python'+Options.options.python_version, uselib_store='PYTHON') and \
+            conf.check_cxx(header_name='Python.h', uselib_store='PYTHON',
+                           includes=python_includes)
+
     # xml
     if not Options.options.disable_xml:
         ret = None
@@ -365,6 +398,8 @@ def build(bld):
         bld.add_subdirs('src/plugins/os')
     if bld.env['ENABLE_GMP']:
         bld.add_subdirs('src/plugins/gmp')
+    if bld.env['ENABLE_PYTHON_INTERFACE']:
+        bld.add_subdirs('src/python')
 
     if bld.env['ENABLE_TESTS']:
       bld.add_subdirs('test')
