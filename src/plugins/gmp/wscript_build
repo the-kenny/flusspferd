@@ -24,10 +24,10 @@
 libtype = 'shlib'
 
 obj = bld.new_task_gen('cxx', libtype)
-obj.source = ['posix.cpp']
+obj.source = ['gmp.cpp']
 obj.includes = ['../../../include', '.']
 obj.uselib_local = 'flusspferd'
-obj.uselib = 'JS_H POSIX'
-obj.target = 'posix'
+obj.uselib = 'JS_H GMP'
+obj.target = 'gmp'
 obj.install_path = '${PREFIX}/lib/flusspferd/modules'
 

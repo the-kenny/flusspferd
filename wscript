@@ -83,6 +83,10 @@ def set_options(opt):
                    help='Disable cURL extension even if cURL is installed.')
     opt.add_option('--disable-sqlite', action='store_true',
                    help='Disable SQLite even if it is installed.')
+    opt.add_option('--disable-os', action='store_true',
+                   help='Disable OS extension.')
+    opt.add_option('--disable-gmp', action='store_true',
+                   help='Disable GMP extension even if GMP is installed.')
     opt.add_option('--with-spidermonkey-include', action='store', nargs=1,
                    dest='spidermonkey_include',
                    help='spidermonkey include path without the js/')
@@ -239,6 +243,14 @@ int main() {
 ''') and conf.check_cxx(lib = 'sqlite3', uselib_store='SQLITE')
         conf.env['ENABLE_SQLITE'] = available
 
+    # gmp
+    if not Options.options.disable_gmp:
+        available = \
+          conf.check_cxx(lib='gmp', uselib_store='GMP') and \
+          conf.check_cxx(lib='gmpxx', uselib_store='GMP') and \
+          conf.check_cxx(header_name='gmpxx.h', uselib_store='GMP')
+        conf.env['ENABLE_GMP'] = available
+
     # xml
     if not Options.options.disable_xml:
         ret = None
@@ -297,6 +309,8 @@ int main() {
           conf.check_cxx(header_name = 'curl/curl.h', uselib_store='CURL')):
         conf.env['ENABLE_CURL'] = True
 
+    conf.env['ENABLE_OS'] = not Options.options.disable_os
+
     if conf.find_program('emacs', var='EMACS'):
         conf.env['HAS_EMACS'] = True
 
@@ -347,6 +361,10 @@ def build(bld):
         bld.add_subdirs('src/plugins/posix')
     if bld.env['ENABLE_CURL']:
         bld.add_subdirs('src/plugins/curl')
+    if bld.env['ENABLE_OS']:
+        bld.add_subdirs('src/plugins/os')
+    if bld.env['ENABLE_GMP']:
+        bld.add_subdirs('src/plugins/gmp')
 
     if bld.env['ENABLE_TESTS']:
       bld.add_subdirs('test')

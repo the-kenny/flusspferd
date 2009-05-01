@@ -1,6 +1,6 @@
-// vim:ts=2:sw=2:expandtab:autoindent:
+// vim:ts=2:sw=2:expandtab:autoindent:filetype=cpp:
 /*
-Copyright (c) 2008 Aristid Breitkreuz, Ash Berlin, Ruediger Sonderfeld
+Copyright (c) 2008 Rüdiger Sonderfeld
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,19 +21,45 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-// Set default paths to the plugin dirs
-require.paths.push(
-  'src/js',
-  'src/plugins/sqlite3', 'build/default/src/plugins/sqlite3',
-  'src/plugins/curl', 'build/default/src/plugins/curl',
-  'src/plugins/posix', 'build/default/src/plugins/posix',
-  'src/plugins/os', 'build/default/src/plugins/os',
-  'src/plugins/gmp', 'build/default/src/plugins/gmp',
-  'build/default/src/plugins/environment',
-  'build/default/src'
-);
+#ifndef WIN32
+#define POSIX
+#endif
 
-require.alias['XML'] = 'flusspferd-xml'
-require.alias['IO'] = 'flusspferd-io'
+#include "flusspferd/class.hpp"
+#include "flusspferd/create.hpp"
+#include "flusspferd/security.hpp"
 
-prelude = 'src/js/prelude.js';
+#include <cstdlib>
+
+#ifdef POSIX
+#include <time.h>
+#include <cerrno>
+#elif WIN32
+#include <windows.h>
+#else
+#error "OS not supported by os plugin"
+#endif
+
+using namespace flusspferd;
+
+namespace {
+#ifdef POSIX
+void sleep_(unsigned ms) {
+  timespec ts;
+  ts.tv_sec = ms/1000;
+  ts.tv_nsec = (ms%1000) * 1000000; // convert ms to ns
+  timespec rem;
+  while(nanosleep(&ts, &rem) == -1 && errno == EINTR)
+    ts = rem;
+}
+#elif WIN32
+void sleep_(unsigned ms) {
+  Sleep(ms);
+}
+#endif
+
+extern "C" void flusspferd_load(object os) {
+  create_native_function(os, "system", &std::system);
+  create_native_function(os, "sleep", &sleep_);
+}
+}
