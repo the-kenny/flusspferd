@@ -23,6 +23,16 @@
 solution "flusspferd"
   configurations { "Debug", "Release" }
   location "build"
+  defines {
+    "XP_UNIX",
+    "JS_THREADSAFE",
+    "JS_C_STRINGS_ARE_UTF8",
+    "FLUSSPFERD_VERSION=\\\"0.0\\\""
+  }
+  includedirs {
+    "./include",
+    "/usr/local/include/boost-1_39"
+  }
 
 project "libflusspferd"
   location "build"
