@@ -34,7 +34,7 @@ local libfp_setup = function()
   defines {
     "JS_THREADSAFE",
     "JS_C_STRINGS_ARE_UTF8",
-    "FLUSSPFERD_VERSION=\\\"0.0\\\""
+    _MAKE.esc('FLUSSPFERD_VERSION=\\"0.0\\"')
   }
 
   configuration "not windows"
@@ -56,7 +56,6 @@ project "libflusspferd"
   }
   libfp_setup()
 
-
 usage "libflusspferd"
   libfp_setup()
 
@@ -69,3 +68,11 @@ project "flusspferd"
   }
 
   links { "libflusspferd" }
+
+  if os.findlib('edit') then
+    defines { 'HAVE_EDITLINE' }
+    if os.findheader("editline/history.h") then
+      defines { 'HAVE_EDITLINE_HISTORY_H' }
+    end
+  end
+
