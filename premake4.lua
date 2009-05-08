@@ -23,21 +23,49 @@
 solution "flusspferd"
   configurations { "Debug", "Release" }
   location "build"
-  defines {
-    "XP_UNIX",
-    "JS_THREADSAFE",
-    "JS_C_STRINGS_ARE_UTF8",
-    "FLUSSPFERD_VERSION=\\\"0.0\\\""
-  }
+
+-- Setup that is shared between the compile and usage sections
+local libfp_setup = function()
   includedirs {
     "./include",
     "/usr/local/include/boost-1_39"
   }
 
+  defines {
+    "JS_THREADSAFE",
+    "JS_C_STRINGS_ARE_UTF8",
+    "FLUSSPFERD_VERSION=\\\"0.0\\\""
+  }
+
+  configuration "not windows"
+    defines { "XP_UNIX" }
+  configuration "windows"
+    defines { "XP_WIN" }
+end
+
 project "libflusspferd"
   location "build"
   language "C++"
   kind "SharedLib"
+
+  -- Set the base name different from the project name
+  targetname "flusspferd"
+
   files {
     "src/spidermonkey/**.cpp"
   }
+  libfp_setup()
+
+
+usage "libflusspferd"
+  libfp_setup()
+
+project "flusspferd"
+  location "build"
+  language "C++"
+  kind "ConsoleApp"
+  files {
+    "src/programms/**.cpp"
+  }
+
+  links { "libflusspferd" }
