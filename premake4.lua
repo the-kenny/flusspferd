@@ -20,6 +20,8 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 -- THE SOFTWARE.
 
+dofile "premake4/boost.lua"
+
 solution "flusspferd"
   configurations { "Debug", "Release" }
   location "build"
@@ -36,6 +38,8 @@ local libfp_setup = function()
     "JS_C_STRINGS_ARE_UTF8",
     _MAKE.esc('FLUSSPFERD_VERSION=\\"0.0\\"')
   }
+
+  boost()
 
   configuration "not windows"
     defines { "XP_UNIX" }
