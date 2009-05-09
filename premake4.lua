@@ -39,7 +39,7 @@ local libfp_setup = function()
     _MAKE.esc('FLUSSPFERD_VERSION=\\"0.0\\"')
   }
 
-  boost()
+  check_boost({})
 
   configuration "not windows"
     defines { "XP_UNIX" }
