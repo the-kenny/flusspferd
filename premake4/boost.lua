@@ -41,23 +41,6 @@ function table.push(self,...)
   end
 end
 
-function string:split(pat)
-  local st, g = 1, self:gmatch("()("..pat..")")
-
-  local n = 0;
-  local function getter(self, segs, seps, sep, cap1, ...)
-    st = sep and seps + #sep
-    return self:sub(segs, (seps or 0) - 1), cap1 or sep, ...
-  end
-  local function splitter(self)
-
-    if st then
-      n = n+1;
-      return n, getter(self, st, g())
-    end
-  end
-  return splitter, self
-end
 
 local function to_list(s)
   if type(s) == "table" then
@@ -65,9 +48,9 @@ local function to_list(s)
   end
 
   if os.is("windows") then
-    return s:split(";")
+    return s:explode(";")
   else
-    return s:split(":")
+    return s:explode(":")
   end
 end
 
@@ -381,7 +364,7 @@ local function find_boost_library(lib, kw)
       local libname = file:match(pat)
       if libname then
         local libtags = {}
-        for n,tag in libname:split('-') do
+        for n,tag in ipairs(libname:explode('-')) do
           if n > 1 then table.insert(libtags, tag) end
         end
         local cur_score = tags_score(libtags, kw)
@@ -420,7 +403,15 @@ local function find_boost_library(lib, kw)
     libname,file = find_library_from_list(lib,files)
   end
   if libname ~= nil then
-    links { file }
+    local dir = path.getdirectory(file)
+    file = path.getbasename(file)
+    if os.is("windows") then 
+      libname = "libboost_" .. libname
+    else
+      libname = "boost_" .. libname
+    end
+    links { libname }
+    libdirs { dir }
     return;
   end
 end

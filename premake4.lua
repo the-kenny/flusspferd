@@ -22,6 +22,17 @@
 
 dofile "premake4/boost.lua"
 
+newoption {
+  trigger = "spidermonkey-include",
+  description = "spidermonkey include directory",
+  value = "dir",
+}
+newoption {
+  trigger = "spidermonkey-libs",
+  description = "spidermonkey lib directory",
+  value = "dir",
+}
+
 solution "flusspferd"
   configurations { "Debug", "Release" }
   location "build"
@@ -33,9 +44,9 @@ local libfp_setup = function()
   }
 
   defines {
-    "JS_THREADSAFE",
-    "JS_C_STRINGS_ARE_UTF8",
-    _MAKE.esc('FLUSSPFERD_VERSION=\\"0.0\\"')
+    --"JS_THREADSAFE",
+    --"JS_C_STRINGS_ARE_UTF8",
+    'FLUSSPFERD_VERSION=\\"0z0\\"'
   }
 
   check_boost {
@@ -44,8 +55,29 @@ local libfp_setup = function()
     mandatory = 1
   }
 
+  local inc_path = _OPTIONS['spidermonkey-include']
+  local path = os.findheader('js/js-config.h', inc_path)
+  if path then
+    if path == inc_path then
+      includedirs { inc_path }
+    end
+  else
+    error("js/js-config.h not found",0)
+  end
+
+  local lib_path = _OPTIONS['spidermonkey-libs']
+  local newpath = os.findlib('mozjs', lib_path)
+  if newpath then
+    links { 'mozjs'}
+    libdirs { lib_path }
+  else
+    error("mozjs lib not found", 0)
+  end
+
+
   configuration "not windows"
     defines { "XP_UNIX" }
+
   configuration "windows"
     defines { "XP_WIN" }
 end
@@ -61,6 +93,7 @@ project "libflusspferd"
   files {
     "src/spidermonkey/**.cpp"
   }
+
   libfp_setup()
 
 usage "libflusspferd"
@@ -71,12 +104,17 @@ project "flusspferd"
   language "C++"
   kind "ConsoleApp"
   files {
-    "src/programms/**.cpp"
+    "src/programs/**.cpp"
+  }
+
+  defines {
+    'INSTALL_PREFIX=\\"' .. _MAKE.esc(project().location) .. '\\"'
   }
 
   links { "libflusspferd" }
 
   if os.findlib('edit') then
+    links { 'edit' }
     defines { 'HAVE_EDITLINE' }
     if os.findheader("editline/history.h") then
       defines { 'HAVE_EDITLINE_HISTORY_H' }
