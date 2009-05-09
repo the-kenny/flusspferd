@@ -13,6 +13,25 @@ function os.capture(cmd, raw)
 end
 
 
+-- TODO: does this want to be on premake. or something?
+function get_shlib_format()
+  if os.is("windows") then
+    return "%s.dll"
+  elseif os.is("macosx") then
+    return "lib%s.dylib"
+  else
+    return "lib%s.so"
+  end
+end
+
+function get_staticlib_format()
+  if os.is("windows") then
+    return "%s.lib"
+  else
+    return "lib%s.a"
+  end
+end
+
 function table.push(self,...)
   if ... then
     local targs = {...}
@@ -66,9 +85,11 @@ local STATIC_NOSTATIC = 'nostatic'
 local STATIC_BOTH = 'both'
 local STATIC_ONLYSTATIC = 'onlystatic'
 
-local is_versiontag = "%d+_%d+_?%d%"
-local is_threadingtag = "mt"
-local is_abitag = "[sgydpn]+"
+local tag_matchers = {
+  version = "^%d+_%d+_?%d%$",
+  threading = "^mt$",
+  is_abitag = "^[sgydpn]+$",
+}
 local toolsets = { 'acc','borland','como','cw','dmc','darwin','gcc','hp_cxx','intel','kylix','msvc','qcc','sun','vacpp' }
 
 local logfile
@@ -93,7 +114,7 @@ local function string_to_version(s)
 end
 
 local function version_string(version)
-  local major = versoin / 1000000
+  local major = version / 1000000
   local minor = version / 100 % 1000
   local minor_minor = version % 100
   if minor_minor == 0 then
@@ -105,10 +126,10 @@ end
 
 local function libfiles(lib, pattern, lib_paths)
   local result = {}
-  for _,lib_path in ipairs(lib_paths) do
-    local libname = path.join(lib_path) .. pattern:format('boost_' + lib + '*')
-    if os.isfile(libname) then
-      table.insert(result, lib_path)
+  for _,lib_path in to_list(lib_paths) do
+    local libname = path.join(lib_path, pattern:format('boost_' .. lib .. '*'))
+    for _,k in ipairs(os.matchfiles(libname)) do
+      table.insert(result, k)
     end
   end
   return result
@@ -196,13 +217,63 @@ local function set_default(kw, var, val)
   end
 end
 
+--[[
+	checks library tags
+
+	see http://www.boost.org/doc/libs/1_35_0/more/getting_started/unix-variants.html 6.1
+]]
+local function tags_score(tags, kw)
+  local score = 0
+  local needed_tags = {
+    threading = kw.tag_threading,
+    abi = kw.tag_abi,
+    toolset = kw.tag_toolset,
+    version = kw.tag_version
+  }
+
+  if kw.tag_toolset == nil then
+    local cc = _get_compiler() 
+    local toolset = cc.cc
+
+    -- TODO: compiler version support
+    needed_tags.toolset = toolset
+  end
+
+  local found_tags = {}
+  for _,tag in ipairs(tags) do
+    for n,p in pairs(tag_matchers) do
+      if tag:match(p) then
+        found_tags[n] = tag
+      end
+    end
+
+    for _,p in pairs(toolsets) do
+      if tag:match('^' .. p .. '$') then
+        found_tags.toolset = tag
+      end
+    end
+  end
+
+  for tagname,val in pairs(needed_tags) do
+    if val ~= nil and found_tags[tagname] then
+      if found_tags[tagname]:match(val) then
+        score = score + kw['score_' .. tagname][1]
+      else
+        score = score + kw['score_' .. tagname][2]
+      end
+    end
+  end
+
+  return score
+end
+
 local function validate_boost(kw)
   local ver = kw.version or ""
   for _,x in pairs({'min_version','max_version','version'}) do
     set_default(kw, x, ver)
   end
 
-  set_default(kw, 'lib', '')
+  set_default(kw, 'lib', {})
   set_default(kw, 'libpath', boost_libpath)
   set_default(kw, 'cpppath', boost_cpppath)
 
@@ -239,7 +310,6 @@ local function find_boost_includes(kw)
   local boostPath = _OPTIONS["boost-includes"]
   if boostPath then
     -- TODO: expand ~ if need be?
-
   else
     boostPath = kw.cpppath
   end
@@ -267,7 +337,6 @@ local function find_boost_includes(kw)
         ret = get_boost_version_number(path)
       end
 
-      dump({ret,min_version,max_version})
       if ret ~= -1 and ret >= min_version and ret <= max_version and ret > version then
         boost_path = path
         version = ret
@@ -276,7 +345,16 @@ local function find_boost_includes(kw)
   end
   
   if not version then
-    error( ("boost headers not found! (required version min: %s, max: %s)"):format( kw.min_version, kw.max_version))
+    -- As a fallback, just try looking in the default compiler include paths
+    ret = get_boost_version_number(path)
+    if ret ~= -1 and ret >= min_version and ret <= max_version and ret > version then
+      boost_path = nil
+      version = ret
+    end
+
+    if not version then
+      error( ("boost headers not found! (required version min: %s, max: %s)"):format( kw.min_version, kw.max_version))
+    end
   end
 
   local found_version = version_string(version)
@@ -291,6 +369,60 @@ local function find_boost_includes(kw)
   kw.env.CPPPATH_BOOST = boost_path
 
   return ("Version %s (%s)"):format(found_version, boost_path)
+end
+
+local function find_boost_library(lib, kw)
+  local function find_library_from_list(lib, files)
+    local pat = ".*boost_(.*)[.][^.]+$";
+    local result = { nil,nil }
+    local res_score = tonumber(kw.min_score) - 1
+    local cur_score = 0;
+    for _,file in ipairs(files) do
+      local libname = file:match(pat)
+      if libname then
+        local libtags = {}
+        for n,tag in libname:split('-') do
+          if n > 1 then table.insert(libtags, tag) end
+        end
+        local cur_score = tags_score(libtags, kw)
+        if cur_score > res_score then
+          result = { libname, file }
+          res_score = cur_score
+        end
+      end
+      return unpack(result)
+    end
+  end
+
+
+  local ret
+  local lib_paths = _OPTIONS["boost-libs"]
+  if lib_paths then
+    -- TODO: expand ~ if need be?
+  else
+    lib_paths = kw.libpath
+  end
+
+  local libname,file,files
+
+  if kw.static == STATIC_NOSTATIC or kw.static == STATIC_BOTH then
+    files = libfiles(lib, get_shlib_format(), lib_paths)
+    libname,file = find_library_from_list(lib,files)
+  end
+  if libname == nil and (kw.static == STATIC_ONLYSTATIC or kw.static == STATIC_BOTH) then
+    local pat = get_staticlib_format()
+    if os.is("windows") then
+      -- Boost's static libs on windows are named libboost foo. most libs on
+      -- windows dont have this prefix
+      pat = 'lib' .. pat
+    end
+    files = libfiles(lib, pat, lib_paths)
+    libname,file = find_library_from_list(lib,files)
+  end
+  if libname ~= nil then
+    links { file }
+    return;
+  end
 end
 
 --[[
@@ -327,6 +459,8 @@ function check_boost(options)
   local logfile = path.join(loc, "build.log")
 
   local ret
+  local ok
+
   if not _ACTION or _ACTION == "help" then return end
 
   if options == nil then error("Usage: check_boost(options_table)") end
@@ -334,13 +468,18 @@ function check_boost(options)
   validate_boost(options)
 
   if not options.found_includes then
-    ret = find_boost_includes(options)
+    ok,ret = pcall(find_boost_includes, options)
+    if ok then
+      if options.env.CPPPATH_BOOST then
+        includedirs { options.env.CPPPATH_BOOST } 
+      end
+    elseif options.mandatory then
+      error("Cannot find boost headers!")
+    end
   end
 
-  for _,lib in ipairs(options.lib) do
+  for _,lib in ipairs(options.lib or {}) do
+    find_boost_library(lib, options)
   end
-
-  --local cc = _get_compiler()
-  --_run_cxx_code(boost_code, {includes = {'/usr/local/include/boost-1_37/'}, })
 
 end

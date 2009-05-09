@@ -30,7 +30,6 @@ solution "flusspferd"
 local libfp_setup = function()
   includedirs {
     "./include",
-    "/usr/local/include/boost-1_39"
   }
 
   defines {
@@ -39,7 +38,11 @@ local libfp_setup = function()
     _MAKE.esc('FLUSSPFERD_VERSION=\\"0.0\\"')
   }
 
-  check_boost({})
+  check_boost {
+    lib = { 'thread', 'filesystem', 'system' },
+    min_version = '1.36.0',
+    mandatory = 1
+  }
 
   configuration "not windows"
     defines { "XP_UNIX" }
