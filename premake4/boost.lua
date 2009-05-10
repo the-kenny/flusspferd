@@ -68,13 +68,13 @@ local logfile
 newoption {
   trigger='boost-includes',
   description = 'boost include directory',
-  value = '/usr/local/include/boost-1_35'
+  value = 'path'
 }
 
 newoption {
   trigger='boost-libs',
   description = 'boost lib directory',
-  value = '/usr/local/lib/boost-1_35'
+  value = 'path'
 }
 
 
@@ -280,7 +280,7 @@ local function find_boost_includes(kw)
   local ret
   local boostPath = _OPTIONS["boost-includes"]
   if boostPath then
-    -- TODO: expand ~ if need be?
+    boostPath = path.expand(boostPath)
   else
     boostPath = kw.cpppath
   end
@@ -367,9 +367,9 @@ local function find_boost_library(lib, kw)
 
 
   local ret
-  local lib_paths = _OPTIONS["boost-libs"]
+  local lib_paths =_OPTIONS["boost-libs"]
   if lib_paths then
-    -- TODO: expand ~ if need be?
+    lib_paths = path.expand(lib_paths)
   else
     lib_paths = kw.libpath
   end

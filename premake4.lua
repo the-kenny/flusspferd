@@ -25,12 +25,12 @@ dofile "premake4/boost.lua"
 newoption {
   trigger = "spidermonkey-include",
   description = "spidermonkey include directory",
-  value = "dir",
+  value = "path",
 }
 newoption {
   trigger = "spidermonkey-libs",
   description = "spidermonkey lib directory",
-  value = "dir",
+  value = "path",
 }
 
 solution "flusspferd"
@@ -49,24 +49,18 @@ local libfp_setup = function()
     'FLUSSPFERD_VERSION=\\"0z0\\"'
   }
 
-  check_boost {
-    lib = { 'thread', 'filesystem', 'system' },
-    min_version = '1.36.0',
-    mandatory = 1
-  }
-
-  local inc_path = _OPTIONS['spidermonkey-include']
-  local path = os.findheader('js/js-config.h', inc_path)
-  if path then
-    if path == inc_path then
+  local inc_path = path.expand(_OPTIONS['spidermonkey-include'])
+  local newpath = os.findheader('js/js-config.h', inc_path)
+  if newpath then
+    if newpath == inc_path then
       includedirs { inc_path }
     end
   else
     error("js/js-config.h not found",0)
   end
 
-  local lib_path = _OPTIONS['spidermonkey-libs']
-  local newpath = os.findlib('mozjs', lib_path)
+  local lib_path = path.expand(_OPTIONS['spidermonkey-libs'])
+  newpath = os.findlib('mozjs', lib_path)
   if newpath then
     links { 'mozjs'}
     libdirs { lib_path }
@@ -74,6 +68,11 @@ local libfp_setup = function()
     error("mozjs lib not found", 0)
   end
 
+  check_boost {
+    lib = { 'thread', 'filesystem', 'system' },
+    min_version = '1.36.0',
+    mandatory = 1
+  }
 
   configuration "not windows"
     defines { "XP_UNIX" }
@@ -93,6 +92,8 @@ project "libflusspferd"
   files {
     "src/spidermonkey/**.cpp"
   }
+
+
 
   libfp_setup()
 
