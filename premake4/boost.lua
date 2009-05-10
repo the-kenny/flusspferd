@@ -1,16 +1,4 @@
-
 -- helper methods
-
-function os.capture(cmd, raw)
-  -- Does anything not have io.popen?
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
-  f:close()
-  if raw then return s end
-  s = string.gsub(s, '^%s+', '')
-  s = string.gsub(s, '%s+$', '')
-  return s
-end
 
 
 -- TODO: does this want to be on premake. or something?
